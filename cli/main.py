@@ -7,7 +7,11 @@ import re
 import pprint
 import os
 import subprocess
-import rich
+from rich.columns import Columns
+from rich import print as rprint
+from rich.console import Console
+from rich.syntax import Syntax
+from dataclasses import dataclass
 
 # FIXME #FIXME #FIXME env variable
 OPENAI_KEY = os.environ["OPENAI_KEY"]
@@ -43,12 +47,18 @@ def write_to_file(filename, mode="w"):
     return decorator
 
 
-cyber_persona_prompt = "You are an experienced offensive cybersecurity engineer. You are detail-oriented and have knack for finding edge cases. You are specialized in API testing and know how to identify potential security gaps from the standard API specifications that you are provided. You have 20 plus years experience and are aware of historically security breaches in the past which you leverage to create your own test cases. You understand business requirements well, and you are able to make connections identifying unstated requirements necessary to be tested in an API for which a written specification is often not made as it would be too time consuming for a developer or overlooked because appears as common sense."
-testing_engineer_prompt = "You are a testing engineer focused on correctness. Write only a concise list as in the given example. You wish to test this user story for the above api. You only have access to the api not the code. Write a detailed list of automatable tests you would write to verify the api works. Think of further steps to verify the work is successful."
+@dataclass
+class Persona:
+    cyber = "You are an experienced offensive cybersecurity engineer. You are specialized in API testing and know how to identify potential security gaps from the standard API specifications that you are provided. You have 20 plus years experience and are aware of historically security breaches in the past which you leverage to create your own test cases. You understand business requirements well, and you are able to make connections identifying unstated requirements necessary to be tested in an API for which a written specification is often not made as it would be too time consuming for a developer or overlooked because appears as common sense."
+    tester = "You are a testing engineer focused on correctness. Write only a concise list as in the given example. You wish to test this user story for the above api. You only have access to the api not the code. Write a detailed list of automatable tests you would write to verify the api works. Think of further steps to verify the work is successful."
+    edge_case = "You are a Senior Engineer with a decade of experience. Your detail-oriented nature and gives you a knack for finding tricky edge cases."
 
 
-def test_idea_prompt():
-    prompt = "You are a testing engineer focused on correctness. Write only a concise list as in the given example. You wish to test this user story for the above api. You only have access to the api not the code. Write a detailed list of automatable tests you would write to verify the api works. Think of further steps to verify the work is successful."
+def test_idea_prompt(persona):
+    prompt = (
+        persona
+        + "Write only a concise list as in the given example. You wish to test this user story for the above api. You only have access to the api not the code. Write a detailed list of automatable tests you would write to verify the api works. Think of further steps to verify the work is successful."
+    )
     context = [
         {
             "role": "user",
@@ -254,21 +264,24 @@ def send_to_gpt(prompt: str, top_p: float = 0.5, temperature: float = 0.7, conte
     return response.choices[0].message.content
 
 
-@write_to_file("test_ideas.txt")
-def get_test_ideas():
-    test_ideas = send_to_gpt(
-        "\n".join(get_stories()[1]),
-        context=test_idea_prompt(),
-        top_p=0.3,
-        temperature=0.5,
-    )
-    return test_ideas
+def get_test_ideas(story: str, j: int, persona: str):
+    @write_to_file(f"test_ideas_{j}.txt")
+    def __inner_get_test_ideas(in_j: int):
+        test_ideas = send_to_gpt(
+            story,
+            context=test_idea_prompt(persona),
+            top_p=0.3,
+            temperature=0.5,
+        )
+        return test_ideas
+
+    return __inner_get_test_ideas(j)
 
 
-def generate_test_from(test_idea, test_nr: int):
+def generate_test_from(test_idea: str, story_nr: int, test_nr: int):
     # @write_to_file("test" + str(hash(test_idea)) + ".py")
     # Could call llm to get a decent test name i guess
-    @write_to_file("test_" + str(test_nr) + ".py")
+    @write_to_file(test_name(story_nr, test_nr))
     def __inner_test_generation():
         res = send_to_gpt(
             test_idea,
@@ -281,9 +294,17 @@ def generate_test_from(test_idea, test_nr: int):
     return __inner_test_generation()
 
 
-def run_test(ith: int):
+def test_name(story_nr: int, test_nr: int):
+    return f"test_story_{story_nr}_test_{test_nr}.py"
+
+
+def ideas_name(story_nr: int, persona: str):
+    return f"test_ideas_{story_nr}_{persona}.txt"
+
+
+def run_test(story_nr: int, test_nr: int):
     process = subprocess.Popen(
-        ["python", f"test_{ith}.py"],
+        ["python", test_name(story_nr, test_nr)],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
@@ -294,24 +315,24 @@ def run_test(ith: int):
     output = process.stdout.read().decode("utf-8")
     error_output = process.stderr.read().decode("utf-8")
 
-    print(f"🧪 Test {ith} results:")
+    print(f"🧪 Story {story_nr}, Test {test_nr} results:")
     # print(output)
     # print(exit_code)
     print(error_output)
 
     if exit_code == 0:
-        print(f"✅ Test {ith} passed")
+        print("✅ Test passed")
 
     if "Syntax" in error_output or "Indentation" in error_output:
         print(f"🤯 gpt made a syntax oopsie")
 
     if "AssertionError" in error_output:
-        print(f"❌ Test {ith} failed")
+        print("❌ Test failed")
 
 
 def main():
     # TODO expand the user studies
-
+    stories = ["\n".join(s) for s in get_stories()]
     # TODO iterate over all test ideas
     # tests should have 2d coords (story_nr, idea_nr)
 
@@ -321,23 +342,32 @@ def main():
     #        s, context=test_idea_prompt(), top_p=0.3, temperature=0.1
     #    )
     #    print(test_ideas)
+    story_nr = 3
 
     print("✨ Gathering ideas ✨")
-    test_ideas = split_test_ideas(get_test_ideas())
+    test_ideas = split_test_ideas(
+        get_test_ideas(stories[story_nr], story_nr, Persona.cyber)
+    )
 
     # for idea in test_ideas:
     # test = send_to_gpt(
     # test_ideas[2], context=python_test_prompt(), top_p=0.2, temperature=0.2
     # )
-    ith = 7
+    test_nr = 4
     print("🤓 Generating tests")
-    test = generate_test_from(test_ideas[ith], ith)
+    test = generate_test_from(test_ideas[test_nr], story_nr, test_nr)
 
-    run_test(ith)
+    syntax = Syntax(test, "python", theme="monokai", line_numbers=True)
+    console = Console()
+    console.print(syntax)
 
-    # print(test)
+    run_test(story_nr, test_nr)
 
-    # pprint.pprint(test_ideas)
+    ### USER STORY
+    #   wants to generate tests for a user story on some api
+    #   writes a user story
+    #   gets a list of either new user stories or ideas for tests
+    #   gets an overview of a pair of story and test for each idea, can accept or reject or regenerate or continue to next idea
 
 
 if __name__ == "__main__":
