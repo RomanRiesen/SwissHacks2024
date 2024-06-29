@@ -14,7 +14,6 @@
                 "charliermarsh.ruff",
                 "christian-kohler.path-intellisense",
                 "DavidAnson.vscode-markdownlint",
-                "eamodio.gitlens",
                 "GitHub.copilot",
                 "ms-azuretools.vscode-docker",
                 "ms-python.isort",
@@ -24,10 +23,8 @@
                 "ms-toolsai.jupyter-cell-tags",
                 "ms-toolsai.jupyter-renderers",
                 "ms-toolsai.vscode-jupyter-slideshow",
-                "mutantdino.resourcemonitor",
                 "redhat.vscode-yaml",
                 "tamasfe.even-better-toml",
-                "ms-toolsai.tensorboard"
             ],
             "settings": {
                 "terminal.integrated.defaultProfile.linux": "zsh",
