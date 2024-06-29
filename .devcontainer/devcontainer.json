@@ -40,10 +40,5 @@
             }
         }
     },
-    "forwardPorts": [
-        8888,
-        8080
-        //6006
-    ],
-    "postStartCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
+    "postStartCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}"
 }
