@@ -1,11 +1,16 @@
 {
     "name": "SwissHacks 2024 PF",
+    //"initializeCommand": "docker build --network host --tag postfinance-api-ai .",
+    //"image": "postfinance-api-ai",
     "runArgs": [
-        "--ipc=host"
+        "--network=host",
     ],
     "build": {
         "context": "..",
         "dockerfile": "../solution/Dockerfile",
+        "options": [
+            "--add-host=host.docker.internal:host-gateway"
+      ]
         //"target": "dev"
     },
     "customizations": {
