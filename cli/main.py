@@ -5,9 +5,12 @@ import traceback
 import docker
 import re
 import pprint
+import os
+import subprocess
+import rich
 
 # FIXME #FIXME #FIXME env variable
-OPENAI_KEY = "sk-swiss-hacks-group-1-HkjNHMpBPeCLmqB2ykTIT3BlbkFJ55ygWdVAOiShzfxg2fN7"
+OPENAI_KEY = os.environ["OPENAI_KEY"]
 
 app_under_testing_path = "../postfinance/source"
 yaml_path = app_under_testing_path + "/src/main/resources/openapi/openapi.yml"
@@ -21,6 +24,27 @@ test_users = """\
 | jane.smith  | you-dont-guess-me | User  |
 | jimmy.allen | secure-secret     | Admin |
 """
+
+
+def write_to_file(filename, mode="w"):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            if not os.path.exists(filename):
+                with open(filename, mode) as f:
+                    result = func(*args, **kwargs)
+                    f.write(str(result))
+                    return result
+            else:
+                with open(filename, "r") as f:
+                    return f.read()
+
+        return wrapper
+
+    return decorator
+
+
+cyber_persona_prompt = "You are an experienced offensive cybersecurity engineer. You are detail-oriented and have knack for finding edge cases. You are specialized in API testing and know how to identify potential security gaps from the standard API specifications that you are provided. You have 20 plus years experience and are aware of historically security breaches in the past which you leverage to create your own test cases. You understand business requirements well, and you are able to make connections identifying unstated requirements necessary to be tested in an API for which a written specification is often not made as it would be too time consuming for a developer or overlooked because appears as common sense."
+testing_engineer_prompt = "You are a testing engineer focused on correctness. Write only a concise list as in the given example. You wish to test this user story for the above api. You only have access to the api not the code. Write a detailed list of automatable tests you would write to verify the api works. Think of further steps to verify the work is successful."
 
 
 def test_idea_prompt():
@@ -84,17 +108,77 @@ Here is a detailed list of tests that can be performed to verify that the custom
     return context
 
 
-# You are an experienced offensive cybersecurity engineer. You are detail-oriented and have knack for finding edge cases. You are specialized in API testing and know how to identify potential security gaps from the standard API specifications that you are provided. You have 20 plus years experience and are aware of historically security breaches in the past which you leverage on when you create your own test cases. You understand business requirements well, and you are able to make connections identifying unstated requirements necessary to be tested in an API for which a written specification is often not made as it would be too time consuming for a developer or overlooked because appears as common sense.
-
-
 def python_test_prompt():
     prompt = [
         {
             "role": "user",
-            "content": """
-            You wish to test this user story, write a detailed list of tests you would write to verify the api works. Think of further steps to verify the work is successful.
+            "content": "Here is the openapi spec, look at it carefully:\n"
+            + open(yaml_path, "r").read()
+            + "It has the following default users:\n"
+            + test_users
+            + """
+            Write a test in python for: Test that the API returns a 400 Bad Request status code when the first name or last name exceeds the maximum length of 32 characters.
 """,
-        }
+        },
+        {
+            "role": "assistant",
+            "content": """
+```
+import requests
+import string
+import random
+
+# Set up the API endpoint and test data
+url = "http://localhost:8080/customers/register"
+
+# Test first name exceeds max length
+data = {
+    "firstName": "a" * 33,
+    "lastName": "Doe",
+    "dateOfBirth": "1990-01-01"
+}
+response = requests.post(url, json=data)
+assert response.status_code == 400
+
+# Test last name exceeds max length
+data = {
+    "firstName": "John",
+    "lastName": "a" * 33,
+    "dateOfBirth": "1990-01-01"
+}
+response = requests.post(url, json=data)
+assert response.status_code == 400
+
+# Test excessively long input
+data = {
+    "firstName": "a" * 1000,
+    "lastName": "Doe",
+    "dateOfBirth": "1990-01-01"
+}
+response = requests.post(url, json=data)
+assert response.status_code == 400
+
+# Test special characters
+data = {
+    "firstName": "<script>alert('XSS')</script>",
+    "lastName": "Doe",
+    "dateOfBirth": "1990-01-01"
+}
+response = requests.post(url, json=data)
+assert response.status_code == 400
+
+# Test non-ASCII characters
+data = {
+    "firstName": "John".encode("utf-8").decode("utf-8"),
+    "lastName": "Smith".encode("utf-8").decode("utf-8"),
+    "dateOfBirth": "1990-01-01"
+}
+response = requests.post(url, json=data)
+assert response.status_code == 201
+```
+"""
+            + """You are an experienced developer. Do not annotate code in any way except for comments. Write a python test as above for:""",
+        },
     ]
     return prompt
 
@@ -170,28 +254,88 @@ def send_to_gpt(prompt: str, top_p: float = 0.5, temperature: float = 0.7, conte
     return response.choices[0].message.content
 
 
-def main():
-    # for story in get_stories():
-    #    s = "\n".join(story)
-    #    test_ideas = send_to_gpt(
-    #        s, context=test_idea_prompt(), top_p=0.3, temperature=0.1
-    #    )
-    #    print(test_ideas)
+@write_to_file("test_ideas.txt")
+def get_test_ideas():
     test_ideas = send_to_gpt(
         "\n".join(get_stories()[1]),
         context=test_idea_prompt(),
         top_p=0.3,
         temperature=0.5,
     )
+    return test_ideas
 
-    test_ideas = split_test_ideas(test_ideas)
 
-    # for idea in test_ideas:
-    test = send_to_gpt(
-        test_ideas[2], context=python_test_prompt(), top_p=0.2, temperature=0.3
+def generate_test_from(test_idea, test_nr: int):
+    # @write_to_file("test" + str(hash(test_idea)) + ".py")
+    # Could call llm to get a decent test name i guess
+    @write_to_file("test_" + str(test_nr) + ".py")
+    def __inner_test_generation():
+        res = send_to_gpt(
+            test_idea,
+            context=python_test_prompt(),
+            top_p=0.2,
+            temperature=0.2,
+        )
+        return res.split("```")[1][6:-4]
+
+    return __inner_test_generation()
+
+
+def run_test(ith: int):
+    process = subprocess.Popen(
+        ["python", f"test_{ith}.py"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
 
-    print(test)
+    process.wait()
+
+    exit_code = process.returncode
+    output = process.stdout.read().decode("utf-8")
+    error_output = process.stderr.read().decode("utf-8")
+
+    print(f"🧪 Test {ith} results:")
+    # print(output)
+    # print(exit_code)
+    print(error_output)
+
+    if exit_code == 0:
+        print(f"✅ Test {ith} passed")
+
+    if "Syntax" in error_output or "Indentation" in error_output:
+        print(f"🤯 gpt made a syntax oopsie")
+
+    if "AssertionError" in error_output:
+        print(f"❌ Test {ith} failed")
+
+
+def main():
+    # TODO expand the user studies
+
+    # TODO iterate over all test ideas
+    # tests should have 2d coords (story_nr, idea_nr)
+
+    # for story in get_stories():
+    #    s = "\n".join(story)
+    #    test_ideas = send_to_gpt(
+    #        s, context=test_idea_prompt(), top_p=0.3, temperature=0.1
+    #    )
+    #    print(test_ideas)
+
+    print("✨ Gathering ideas ✨")
+    test_ideas = split_test_ideas(get_test_ideas())
+
+    # for idea in test_ideas:
+    # test = send_to_gpt(
+    # test_ideas[2], context=python_test_prompt(), top_p=0.2, temperature=0.2
+    # )
+    ith = 7
+    print("🤓 Generating tests")
+    test = generate_test_from(test_ideas[ith], ith)
+
+    run_test(ith)
+
+    # print(test)
 
     # pprint.pprint(test_ideas)
 
