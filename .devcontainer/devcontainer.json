@@ -15,7 +15,6 @@
                 "christian-kohler.path-intellisense",
                 "DavidAnson.vscode-markdownlint",
                 "GitHub.copilot",
-                "ms-azuretools.vscode-docker",
                 "ms-python.isort",
                 "ms-python.mypy-type-checker",
                 "ms-python.python",
@@ -46,4 +45,5 @@
         8080
         //6006
     ],
+    "postStartCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
 }
