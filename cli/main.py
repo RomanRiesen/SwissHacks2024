@@ -7,6 +7,7 @@ import re
 import pprint
 
 # FIXME #FIXME #FIXME env variable
+OPENAI_KEY = "sk-swiss-hacks-group-1-HkjNHMpBPeCLmqB2ykTIT3BlbkFJ55ygWdVAOiShzfxg2fN7"
 
 app_under_testing_path = "../postfinance/source"
 yaml_path = app_under_testing_path + "/src/main/resources/openapi/openapi.yml"
@@ -81,6 +82,21 @@ Here is a detailed list of tests that can be performed to verify that the custom
     ]
     print(context)
     return context
+
+
+# You are an experienced offensive cybersecurity engineer. You are detail-oriented and have knack for finding edge cases. You are specialized in API testing and know how to identify potential security gaps from the standard API specifications that you are provided. You have 20 plus years experience and are aware of historically security breaches in the past which you leverage on when you create your own test cases. You understand business requirements well, and you are able to make connections identifying unstated requirements necessary to be tested in an API for which a written specification is often not made as it would be too time consuming for a developer or overlooked because appears as common sense.
+
+
+def python_test_prompt():
+    prompt = [
+        {
+            "role": "user",
+            "content": """
+            You wish to test this user story, write a detailed list of tests you would write to verify the api works. Think of further steps to verify the work is successful.
+""",
+        }
+    ]
+    return prompt
 
 
 test1 = """
@@ -170,8 +186,12 @@ def main():
 
     test_ideas = split_test_ideas(test_ideas)
 
-    for idea in test_ideas:
-        pprint.pprint(idea)
+    # for idea in test_ideas:
+    test = send_to_gpt(
+        test_ideas[2], context=python_test_prompt(), top_p=0.2, temperature=0.3
+    )
+
+    print(test)
 
     # pprint.pprint(test_ideas)
 
