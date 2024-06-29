@@ -1,0 +1,52 @@
+{
+    "name": "SwissHacks 2024 PF",
+    "runArgs": [
+        "--ipc=host"
+    ],
+    "build": {
+        "context": "..",
+        "dockerfile": "../solution/Dockerfile",
+        //"target": "dev"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "charliermarsh.ruff",
+                "christian-kohler.path-intellisense",
+                "DavidAnson.vscode-markdownlint",
+                "eamodio.gitlens",
+                "GitHub.copilot",
+                "ms-azuretools.vscode-docker",
+                "ms-python.isort",
+                "ms-python.mypy-type-checker",
+                "ms-python.python",
+                "ms-toolsai.jupyter",
+                "ms-toolsai.jupyter-cell-tags",
+                "ms-toolsai.jupyter-renderers",
+                "ms-toolsai.vscode-jupyter-slideshow",
+                "mutantdino.resourcemonitor",
+                "redhat.vscode-yaml",
+                "tamasfe.even-better-toml",
+                "ms-toolsai.tensorboard"
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "zsh",
+                "terminal.integrated.profiles.linux": {
+                    "zsh": {
+                        "path": "/bin/zsh"
+                    }
+                },
+                "mypy-type-checker.importStrategy": "fromEnvironment",
+                "mypy-type-checker.preferDaemon": true,
+                "mypy-type-checker.reportingScope": "workspace",
+                "editor.formatOnSave": true,
+                "python.analysis.typeCheckingMode": "strict"
+            }
+        }
+    },
+    "forwardPorts": [
+        8888,
+        8080
+        //6006
+    ],
+}
