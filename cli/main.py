@@ -4,14 +4,15 @@ import requests
 import traceback
 import docker
 import re
-import pprint
 import os
 import subprocess
 from rich.columns import Columns
 from rich import print as rprint
+from rich.panel import Panel
 from rich.console import Console
 from rich.syntax import Syntax
 from dataclasses import dataclass
+from rich.markdown import Markdown
 
 # FIXME #FIXME #FIXME env variable
 OPENAI_KEY = os.environ["OPENAI_KEY"]
@@ -49,15 +50,29 @@ def write_to_file(filename, mode="w"):
 
 @dataclass
 class Persona:
-    cyber = "You are an experienced offensive cybersecurity engineer. You are specialized in API testing and know how to identify potential security gaps from the standard API specifications that you are provided. You have 20 plus years experience and are aware of historically security breaches in the past which you leverage to create your own test cases. You understand business requirements well, and you are able to make connections identifying unstated requirements necessary to be tested in an API for which a written specification is often not made as it would be too time consuming for a developer or overlooked because appears as common sense."
-    tester = "You are a testing engineer focused on correctness. Write only a concise list as in the given example. You wish to test this user story for the above api. You only have access to the api not the code. Write a detailed list of automatable tests you would write to verify the api works. Think of further steps to verify the work is successful."
-    edge_case = "You are a Senior Engineer with a decade of experience. Your detail-oriented nature and gives you a knack for finding tricky edge cases."
+    common = "You write clear and concise code that gives. "
+    cyber = (
+        common
+        + "You are an experienced offensive cybersecurity engineer. You are specialized in API testing and know how to identify potential security gaps from the standard API specifications that you are provided. You have 20 plus years experience and are aware of historically security breaches in the past which you leverage to create your own test cases. You understand business requirements well, and you are able to make connections identifying unstated requirements necessary to be tested in an API for which a written specification is often not made as it would be too time consuming for a developer or overlooked because appears as common sense."
+    )
+    tester = (
+        common
+        + "You are a testing engineer focused on correctness. Write only a concise list as in the given example. You wish to test this user story for the above api. You only have access to the api not the code. Write a detailed list of automatable tests you would write to verify the api works. Think of further steps to verify the work is successful."
+    )
+    edge_case = (
+        common
+        + "You are a Senior Engineer with a decade of experience. Your detail-oriented nature and gives you a knack for finding tricky edge cases."
+    )
+    golden_path = (
+        common
+        + "You are an expert software engineer and have a knack for writing clean, efficient code. You love verifying the happy path and do so with very readable code."
+    )
 
 
 def test_idea_prompt(persona):
     prompt = (
         persona
-        + "Write only a concise list as in the given example. You wish to test this user story for the above api. You only have access to the api not the code. Write a detailed list of automatable tests you would write to verify the api works. Think of further steps to verify the work is successful."
+        + "Write only a concise list as in the given example. You wish to test this user story for the below api. You only have access to the api not the code. Write a detailed list of automatable tests you would write to verify the api works. Think of further steps to verify the work is successful."
     )
     context = [
         {
@@ -118,7 +133,7 @@ Here is a detailed list of tests that can be performed to verify that the custom
     return context
 
 
-def python_test_prompt():
+def python_test_prompt(persona: str):
     prompt = [
         {
             "role": "user",
@@ -126,6 +141,7 @@ def python_test_prompt():
             + open(yaml_path, "r").read()
             + "It has the following default users:\n"
             + test_users
+            + persona
             + """
             Write a test in python for: Test that the API returns a 400 Bad Request status code when the first name or last name exceeds the maximum length of 32 characters.
 """,
@@ -193,53 +209,6 @@ assert response.status_code == 201
     return prompt
 
 
-test1 = """
-import requests
-import json
-
-def test_customer_registration_exceeds_max_length():
-    # Set up the API endpoint and test data
-    url = "http://localhost:8080/customers/register"
-    headers = {"Content-Type": "application/json"}
-
-    # Test first name exceeds max length
-    data = json.dumps({
-        "firstName": "a" * 33,
-        "lastName": "Doe",
-        "dateOfBirth": "1990-01-01"
-    })
-    response = requests.post(url, headers=headers, data=data)
-    assert response.status_code == 400
-
-    # Test last name exceeds max length
-    data = json.dumps({
-        "firstName": "John",
-        "lastName": "a" * 33,
-        "dateOfBirth": "1990-01-01"
-    })
-    response = requests.post(url, headers=headers, data=data)
-    assert response.status_code == 400
-"""
-
-
-def remove_lines_until_first_function(code):
-    # Find the index of the first function name
-    function_name_index = re.search(r"def .*:", code).end()
-    # Remove the lines up to the end of the first function name
-    code = code[function_name_index:]
-    # Un-indent the code
-    # code = re.sub(r'^ {4}', '', code, flags=re.MULTILINE)
-    code = (
-        "ret = True\ntry: "
-        + code
-        + "except AssertionError as e: ret = traceback.format_exception(e)\n"
-    )
-    return code
-
-
-tests = list(map(remove_lines_until_first_function, [test1]))
-
-
 # TODO search common endpoints for yaml
 def get_stories():
     with open(requirements_path, "r") as file:
@@ -248,9 +217,10 @@ def get_stories():
         return stories
 
 
-def split_test_ideas(test_ideas):
-    return re.split(r"\d+\.", test_ideas)
-    # return test_ideas
+def split_test_plan(test_plan):
+    items = re.split(r"\d+\.", test_plan)
+    # Print each item without the numbering
+    return [item.strip() for item in items]
 
 
 def send_to_gpt(prompt: str, top_p: float = 0.5, temperature: float = 0.7, context=""):
@@ -278,18 +248,23 @@ def get_test_ideas(story: str, j: int, persona: str):
     return __inner_get_test_ideas(j)
 
 
-def generate_test_from(test_idea: str, story_nr: int, test_nr: int):
+def generate_test_from(
+    test_idea: str, story_nr: int, test_nr: int, persona=Persona.edge_case
+):
     # @write_to_file("test" + str(hash(test_idea)) + ".py")
     # Could call llm to get a decent test name i guess
     @write_to_file(test_name(story_nr, test_nr))
     def __inner_test_generation():
         res = send_to_gpt(
             test_idea,
-            context=python_test_prompt(),
+            context=python_test_prompt(persona),
             top_p=0.2,
             temperature=0.2,
         )
-        return res.split("```")[1][6:-4]
+        res = res.split("```")[1][6:]
+        if res[-3:] == "```":
+            res = res[:-3]
+        return res
 
     return __inner_test_generation()
 
@@ -323,11 +298,23 @@ def run_test(story_nr: int, test_nr: int):
     if exit_code == 0:
         print("✅ Test passed")
 
-    if "Syntax" in error_output or "Indentation" in error_output:
+    if (
+        "Syntax" in error_output
+        or "Indentation" in error_output
+        or "NameError" in error_output
+    ):
         print(f"🤯 gpt made a syntax oopsie")
 
     if "AssertionError" in error_output:
         print("❌ Test failed")
+
+
+def interactive():
+    pass
+
+
+def exhaustive():  # default
+    pass
 
 
 def main():
@@ -342,10 +329,13 @@ def main():
     #        s, context=test_idea_prompt(), top_p=0.3, temperature=0.1
     #    )
     #    print(test_ideas)
-    story_nr = 3
+    story_nr = 0
+    test_nr = 2
+
+    choice = "dummy"
 
     print("✨ Gathering ideas ✨")
-    test_ideas = split_test_ideas(
+    test_ideas = split_test_plan(
         get_test_ideas(stories[story_nr], story_nr, Persona.cyber)
     )
 
@@ -353,13 +343,21 @@ def main():
     # test = send_to_gpt(
     # test_ideas[2], context=python_test_prompt(), top_p=0.2, temperature=0.2
     # )
-    test_nr = 4
     print("🤓 Generating tests")
     test = generate_test_from(test_ideas[test_nr], story_nr, test_nr)
 
-    syntax = Syntax(test, "python", theme="monokai", line_numbers=True)
+    test_syntax = Syntax(test, "python", theme="monokai", line_numbers=True)
     console = Console()
-    console.print(syntax)
+    # gherkin = Syntax(stories[story_nr], "markdown", theme="dracula", line_numbers=False)
+
+    # idea_syn = Syntax(
+    # test_ideas[test_nr], "markdown", theme="monokai", line_numbers=False
+    # )
+    gherkin = Markdown(stories[story_nr])
+    idea_syn = Markdown(test_ideas[test_nr])
+    console.print(Columns([Panel(gherkin), Panel(idea_syn), test_syntax]))
+
+    # choice = input("(A)ccept, (R)egenerate Test, (C)ontinue to next plan: ")
 
     run_test(story_nr, test_nr)
 
