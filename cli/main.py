@@ -392,6 +392,7 @@ def interactive():
             if choice.lower() == "a":
                 print("Running Test")
                 run_test(story_nr, test_nr)
+                break
 
 
 def exhaustive():
