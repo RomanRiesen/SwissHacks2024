@@ -13,7 +13,7 @@ Here are some images from the CLI in the interactive mode:
 In the exhaustive mode (passing argument `e`) all user stories (currently at a hard-coded location) are expanded into plans, from which tests are deduced.
 Generating 129 test files this way took 36 minutes. The number is variable however as it depends on llm output (the test idea list).
 
-In the default mode the hard-coded `story_nr` and `test_nr` are used.
+In the default mode (no cli args) the hard-coded `story_nr` and `test_nr` used as inspiration and generated respectively.
 
 ### "Architecture"
 
