@@ -56,3 +56,11 @@ The very next step we would work on is passing obviously failed tests to the LLM
 We believe the tool is extensible into a realworld helper with some distinct ergonomic advantages over a generic "code assistant" due to the «personas» and the nice interactive cli, especially if both would be more integrated in an IDE.
 
 Furthermore at least one person in the team is now tempted to attempt TDD for the very first time.
+
+### Team
+
+Laura Giulietti
+Martin Itten
+Pamela Pogliani
+Roman Riesen
+
