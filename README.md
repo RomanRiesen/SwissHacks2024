@@ -4,7 +4,7 @@ This is the result of a 36h hackathon ([SwissHack](https://www.swisshacks.com/)Â
 
 The goal was to find bugs in a provided API by using LLMs to generate tests from user studies and an openAPI spec.
 
-We provide a cli application that can has two working modes; interactive and exhaustive. In the interactive (passing `i` to the cli) mode user stories can be written for which then a plan (a list of test ideas) is created. This list is then successively worked through, allowing the user to regenerate tests for plans until they are satisfactory (or skipping testing ideas entirely).
+We provide a cli application that has two modes; interactive and exhaustive. In the interactive (passing `i` to the cli) mode user stories can be written for which then a plan (a list of test ideas) is created. This list is then successively worked through, allowing the user to regenerate tests for plans until they are satisfactory (or skipping testing ideas entirely).
 
 Here are some images from the CLI in the interactive mode:
 ![Test Review View](img/test_review.png)
