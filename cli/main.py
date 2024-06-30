@@ -246,7 +246,7 @@ def get_stories():
 def split_test_plan(test_plan):
     items = re.split(r"\d+\.", test_plan)
     # Print each item without the numbering
-    return [item.strip() for item in items]
+    return [item.strip() for item in items][1::]
 
 
 def send_to_gpt(prompt: str, top_p: float = 0.5, temperature: float = 0.7, context=[]):
@@ -261,7 +261,7 @@ def send_to_gpt(prompt: str, top_p: float = 0.5, temperature: float = 0.7, conte
 
 
 def get_test_ideas(story: str, j: int, persona: Persona):
-    print("✨ Gathering ideas ✨")
+    print("✨ Gathering testing ideas ✨")
 
     @write_to_file(ideas_name(j))
     def __inner_get_test_ideas(in_j: int):
@@ -362,20 +362,43 @@ def interactive():
         except FileNotFoundError:
             break
 
-    story = input("Write a user story: ")
+    print("Write a user story (Ctrl-D to finish):")
+    contents = []
+    while True:
+        try:
+            line = input()
+        except EOFError:
+            break
+        contents.append(line)
+
+    story = "\n".join(contents)
+
     test_ideas = split_test_plan(get_test_ideas(story, story_nr, CyberPersona))
 
     for test_nr in range(len(test_ideas)):
         choice = "dummy"
         while choice.lower() != "c":
-            test = generate_test_from(test_ideas[test_nr], story_nr, test_nr)
+            test = generate_test_from(
+                test_ideas[test_nr],
+                story_nr,
+                test_nr,
+                additional_prompt=additional_prompt,
+            )
 
             test_syntax = Syntax(test, "python", theme="monokai", line_numbers=True)
             console = Console()
             gherkin = Markdown(story)
-            idea_syn = Markdown(test_ideas[test_nr])
+            idea_syn = Markdown("## Testing Idea: \n" + test_ideas[test_nr])
             console.print(Markdown(f"# Story {story_nr}, Test {test_nr}"))
-            console.print(Columns([Panel(gherkin), Panel(idea_syn), test_syntax]))
+            console.print(
+                Columns(
+                    [
+                        Panel(gherkin),
+                        Panel(idea_syn),
+                        test_syntax,
+                    ]
+                )
+            )
 
             choice = input(
                 "(A)ccept [runs the test], (R)egenerate Test, (C)ontinue to next plan: "
@@ -392,6 +415,7 @@ def interactive():
             if choice.lower() == "a":
                 print("Running Test")
                 run_test(story_nr, test_nr)
+                input("Enter to continue...")
                 break
 
 
@@ -435,9 +459,11 @@ def main():
     test_syntax = Syntax(test, "python", theme="monokai", line_numbers=True)
     console = Console()
     gherkin = Markdown(stories[story_nr])
-    idea_syn = Markdown(test_ideas[test_nr])
+    idea_syn = Markdown("## Testing Idea: \n" + test_ideas[test_nr])
     console.print(Markdown(f"# Story {story_nr}, Test {test_nr}"))
-    console.print(Columns([Panel(gherkin), Panel(idea_syn), test_syntax]))
+    console.print(
+        Columns([Panel(gherkin), Panel("## Testing Idea: \n" + idea_syn), test_syntax])
+    )
 
     run_test(story_nr, test_nr)
 
