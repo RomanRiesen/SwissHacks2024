@@ -9,13 +9,16 @@ We provide a cli application that can has two working modes; interactive and exh
 In the exhaustive mode (passing argument `e`) all user stories (currently at a hard-coded location) are expanded into plans, from which tests are deduced.
 Generating 129 test files this way took 36 minutes. The number is variable however as it depends on llm output (the test idea list).
 
-In the default mode the predefined `story_nr` and `test_nr` are used.
+In the default mode the hard-coded `story_nr` and `test_nr` are used.
 
 ### "Architecture"
 
 Care was taken to get diverse output as to achieve decent code coverage for that end we introduce «personas», descriptions of different testing specialists, that are passed into the context. For example the «cyber» persona will generate many cases involving xss- or sql-injection attempts.
 
 Furthermore the separation into a more creative first pass of "ideas" and a second pass of implementation also encourages variance in the test coverage as we are able to choose a high temperature and large `top_q` in the ideation without sacrificing the low temperature advantages in the implementation step.
+
+![Test Review View](img/test_review.png)
+![Testing Idea View](img/testing_idea.png)
 
 ### Downloading
 
