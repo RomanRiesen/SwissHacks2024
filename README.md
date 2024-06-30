@@ -6,6 +6,10 @@ The goal was to find bugs in a provided API by using LLMs to generate tests from
 
 We provide a cli application that can has two working modes; interactive and exhaustive. In the interactive (passing `i` to the cli) mode user stories can be written for which then a plan (a list of test ideas) is created. This list is then successively worked through, allowing the user to regenerate tests for plans until they are satisfactory (or skipping testing ideas entirely).
 
+Here are some images from the CLI in the interactive mode:
+![Test Review View](img/test_review.png)
+![Testing Idea View](img/testing_idea.png)
+
 In the exhaustive mode (passing argument `e`) all user stories (currently at a hard-coded location) are expanded into plans, from which tests are deduced.
 Generating 129 test files this way took 36 minutes. The number is variable however as it depends on llm output (the test idea list).
 
@@ -16,9 +20,6 @@ In the default mode the hard-coded `story_nr` and `test_nr` are used.
 Care was taken to get diverse output as to achieve decent code coverage for that end we introduce «personas», descriptions of different testing specialists, that are passed into the context. For example the «cyber» persona will generate many cases involving xss- or sql-injection attempts.
 
 Furthermore the separation into a more creative first pass of "ideas" and a second pass of implementation also encourages variance in the test coverage as we are able to choose a high temperature and large `top_q` in the ideation without sacrificing the low temperature advantages in the implementation step.
-
-![Test Review View](img/test_review.png)
-![Testing Idea View](img/testing_idea.png)
 
 ### Downloading
 
