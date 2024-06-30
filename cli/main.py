@@ -203,7 +203,7 @@ response = requests.post(url, json=data)
 assert response.status_code == 201
 ```
 """
-            + """You are an experienced developer. Do not annotate code in any way except for comments. Write a python test as above for:""",
+            + """You are an experienced developer. Do not annotate code in any way except for comments. Do not try to register users already registered (remember the user list). Write a python test as above for:""",
         },
     ]
     return prompt
@@ -330,7 +330,7 @@ def main():
     #    )
     #    print(test_ideas)
     story_nr = 0
-    test_nr = 2
+    test_nr = 1
 
     choice = "dummy"
 
@@ -358,6 +358,7 @@ def main():
     console.print(Columns([Panel(gherkin), Panel(idea_syn), test_syntax]))
 
     # choice = input("(A)ccept, (R)egenerate Test, (C)ontinue to next plan: ")
+    # you cannot believe how tempted i was to use pseudo-gotos here https://stackoverflow.com/a/438869
 
     run_test(story_nr, test_nr)
 
