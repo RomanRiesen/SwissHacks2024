@@ -4,6 +4,7 @@ import requests
 import traceback
 import docker
 import re
+import sys
 import os
 import subprocess
 from rich.columns import Columns
@@ -50,28 +51,45 @@ def write_to_file(filename, mode="w"):
 
 @dataclass
 class Persona:
-    common = "You write clear and concise code that gives. "
-    cyber = (
-        common
+    prompt = "You write clear and concise code that gives. "
+    identifier: int
+
+
+class CyberPersona(Persona):
+    prompt = (
+        Persona.prompt
         + "You are an experienced offensive cybersecurity engineer. You are specialized in API testing and know how to identify potential security gaps from the standard API specifications that you are provided. You have 20 plus years experience and are aware of historically security breaches in the past which you leverage to create your own test cases. You understand business requirements well, and you are able to make connections identifying unstated requirements necessary to be tested in an API for which a written specification is often not made as it would be too time consuming for a developer or overlooked because appears as common sense."
     )
-    tester = (
-        common
+    identifier = 1
+
+
+class TesterPersona(Persona):
+    prompt = (
+        Persona.prompt
         + "You are a testing engineer focused on correctness. Write only a concise list as in the given example. You wish to test this user story for the above api. You only have access to the api not the code. Write a detailed list of automatable tests you would write to verify the api works. Think of further steps to verify the work is successful."
     )
-    edge_case = (
-        common
+    identifier = 2
+
+
+class EdgeCasePersona(Persona):
+    prompt = (
+        Persona.prompt
         + "You are a Senior Engineer with a decade of experience. Your detail-oriented nature and gives you a knack for finding tricky edge cases."
     )
-    golden_path = (
-        common
+    identifier = 3
+
+
+class HappyPathPersona(Persona):
+    prompt = (
+        Persona.prompt
         + "You are an expert software engineer and have a knack for writing clean, efficient code. You love verifying the happy path and do so with very readable code."
     )
+    identifier = 4  # should've used hashes
 
 
-def test_idea_prompt(persona):
+def test_idea_prompt(persona: Persona):
     prompt = (
-        persona
+        persona.prompt
         + "Write only a concise list as in the given example. You wish to test this user story for the below api. You only have access to the api not the code. Write a detailed list of automatable tests you would write to verify the api works. Think of further steps to verify the work is successful."
     )
     context = [
@@ -129,11 +147,10 @@ Here is a detailed list of tests that can be performed to verify that the custom
             "content": prompt,
         },
     ]
-    print(context)
     return context
 
 
-def python_test_prompt(persona: str):
+def python_test_prompt(persona: Persona):
     prompt = [
         {
             "role": "user",
@@ -141,7 +158,7 @@ def python_test_prompt(persona: str):
             + open(yaml_path, "r").read()
             + "It has the following default users:\n"
             + test_users
-            + persona
+            + persona.prompt
             + """
             Write a test in python for: Test that the API returns a 400 Bad Request status code when the first name or last name exceeds the maximum length of 32 characters.
 """,
@@ -223,7 +240,7 @@ def split_test_plan(test_plan):
     return [item.strip() for item in items]
 
 
-def send_to_gpt(prompt: str, top_p: float = 0.5, temperature: float = 0.7, context=""):
+def send_to_gpt(prompt: str, top_p: float = 0.5, temperature: float = 0.7, context=[]):
     client = OpenAI(api_key=OPENAI_KEY)
     response = client.chat.completions.create(
         model="gpt-4-turbo",
@@ -234,8 +251,10 @@ def send_to_gpt(prompt: str, top_p: float = 0.5, temperature: float = 0.7, conte
     return response.choices[0].message.content
 
 
-def get_test_ideas(story: str, j: int, persona: str):
-    @write_to_file(f"test_ideas_{j}.txt")
+def get_test_ideas(story: str, j: int, persona: Persona):
+    print("✨ Gathering ideas ✨")
+
+    @write_to_file(ideas_name(j, persona))
     def __inner_get_test_ideas(in_j: int):
         test_ideas = send_to_gpt(
             story,
@@ -249,18 +268,28 @@ def get_test_ideas(story: str, j: int, persona: str):
 
 
 def generate_test_from(
-    test_idea: str, story_nr: int, test_nr: int, persona=Persona.edge_case
+    test_idea: str,
+    story_nr: int,
+    test_nr: int,
+    persona=EdgeCasePersona,
+    additional_prompt="",
 ):
+    print("🤓 Generating test")
+
     # @write_to_file("test" + str(hash(test_idea)) + ".py")
     # Could call llm to get a decent test name i guess
     @write_to_file(test_name(story_nr, test_nr))
     def __inner_test_generation():
         res = send_to_gpt(
-            test_idea,
-            context=python_test_prompt(persona),
+            test_idea + additional_prompt,
+            context=python_test_prompt(persona.prompt),
             top_p=0.2,
             temperature=0.2,
         )
+        if len(res) < 7:
+            print("🤯 GPT-4 did not generate a valid test")
+            return  # FIXME
+            # raise Exception("GPT-4 did not generate a valid test")
         res = res.split("```")[1][6:]
         if res[-3:] == "```":
             res = res[:-3]
@@ -273,8 +302,8 @@ def test_name(story_nr: int, test_nr: int):
     return f"test_story_{story_nr}_test_{test_nr}.py"
 
 
-def ideas_name(story_nr: int, persona: str):
-    return f"test_ideas_{story_nr}_{persona}.txt"
+def ideas_name(story_nr: int, persona: Persona):
+    return f"test_ideas_{story_nr}_{persona.identifier}.txt"
 
 
 def run_test(story_nr: int, test_nr: int):
@@ -310,14 +339,59 @@ def run_test(story_nr: int, test_nr: int):
 
 
 def interactive():
-    pass
+    additional_prompt = ""
+    story_nr = len(get_stories())
+
+    os.remove(ideas_name(story_nr))
+    while True:
+        try:
+            os.remove(test_name(story_nr, 0))
+        except FileNotFoundError:
+            break
+
+    story = input("Write a user story: ")
+    test_ideas = split_test_plan(get_test_ideas(story, story_nr, CyberPersona))
+
+    for test_nr in range(len(test_ideas)):
+        choice = "dummy"
+        while choice.lower() != "c":
+            test = generate_test_from(test_ideas[test_nr], story_nr, test_nr)
+
+            test_syntax = Syntax(test, "python", theme="monokai", line_numbers=True)
+            console = Console()
+            gherkin = Markdown(story)
+            idea_syn = Markdown(test_ideas[test_nr])
+            console.print(Columns([Panel(gherkin), Panel(idea_syn), test_syntax]))
+
+            choice = input(
+                "(A)ccept [runs the test], (R)egenerate Test, (C)ontinue to next plan: "
+            )
+            if choice.lower() == "r":
+                os.remove(test_name(story_nr, test_nr))
+                additional_prompt = input("Additional prompt: ")
+                continue
+
+        if choice.lower() == "a":
+            run_test(story_nr, test_nr)
 
 
-def exhaustive():  # default
-    pass
+def exhaustive():
+    stories = ["\n".join(s) for s in get_stories()]
+    for jj, story in enumerate(stories):
+        test_ideas = get_test_ideas(story, jj, Persona.cyber)
+        for ii, idea in enumerate(split_test_plan(test_ideas)):
+            generate_test_from(idea, jj, ii, Persona.cyber)
 
 
 def main():
+    if len(sys.argv) > 1:
+        if sys.argv[1][0].lower() == "e":
+            exhaustive()
+            return
+        if sys.argv[1][0].lower() == "i":
+            interactive()
+            return
+
     # TODO expand the user studies
     stories = ["\n".join(s) for s in get_stories()]
     # TODO iterate over all test ideas
@@ -332,33 +406,17 @@ def main():
     story_nr = 0
     test_nr = 1
 
-    choice = "dummy"
-
-    print("✨ Gathering ideas ✨")
     test_ideas = split_test_plan(
-        get_test_ideas(stories[story_nr], story_nr, Persona.cyber)
+        get_test_ideas(stories[story_nr], story_nr, CyberPersona)
     )
 
-    # for idea in test_ideas:
-    # test = send_to_gpt(
-    # test_ideas[2], context=python_test_prompt(), top_p=0.2, temperature=0.2
-    # )
-    print("🤓 Generating tests")
     test = generate_test_from(test_ideas[test_nr], story_nr, test_nr)
 
     test_syntax = Syntax(test, "python", theme="monokai", line_numbers=True)
     console = Console()
-    # gherkin = Syntax(stories[story_nr], "markdown", theme="dracula", line_numbers=False)
-
-    # idea_syn = Syntax(
-    # test_ideas[test_nr], "markdown", theme="monokai", line_numbers=False
-    # )
     gherkin = Markdown(stories[story_nr])
     idea_syn = Markdown(test_ideas[test_nr])
     console.print(Columns([Panel(gherkin), Panel(idea_syn), test_syntax]))
-
-    # choice = input("(A)ccept, (R)egenerate Test, (C)ontinue to next plan: ")
-    # you cannot believe how tempted i was to use pseudo-gotos here https://stackoverflow.com/a/438869
 
     run_test(story_nr, test_nr)
 

@@ -4,11 +4,11 @@ This is the result of a 36h hackathon ([SwissHack](https://www.swisshacks.com/)�
 
 The goal was to find bugs in a provided API by using LLMs to generate tests from user studies and an openAPI spec.
 
-We provide a cli application that can has two working modes; interactive and exhaustive. In the interactive mode the user can put in new user stories for which then a plan (a list of tests) is created. This list is then successively worked through, allowing the user to regenerate tests for plans until they are satisfying (or skipping testing ideas entirely).
+We provide a cli application that can has two working modes; interactive and exhaustive. In the interactive (passing `i` to the cli) mode the user can put in new user stories for which then a plan (a list of tests) is created. This list is then successively worked through, allowing the user to regenerate tests for plans until they are satisfying (or skipping testing ideas entirely).
 
-In the exhaustive mode all user stories (currently at a fixed location) are expanded into plans, from which tests are deduced.
+In the exhaustive mode (passing argument `e`) all user stories (currently at a fixed location) are expanded into plans, from which tests are deduced.
 
-Having a second pair of ~~eyes~~ tokenizers to work out edge cases in writing tests has proven helpful even during the hackathon.
+In the default mode the predefined `story_nr` and `test_nr` are used.
 
 Care was taken to get diverse output as to achieve decent code coverage for that end we introduce «personas», descriptions of different testing specialists, that are passed into the context. For example the «cyber» persona will generate many cases involving xss- or sql-injection attempts.
 
