@@ -14,13 +14,22 @@ from rich.console import Console
 from rich.syntax import Syntax
 from dataclasses import dataclass
 from rich.markdown import Markdown
+import pathlib
 
 # FIXME #FIXME #FIXME env variable
 OPENAI_KEY = os.environ["OPENAI_KEY"]
 
-app_under_testing_path = "../postfinance/source"
-yaml_path = app_under_testing_path + "/src/main/resources/openapi/openapi.yml"
-requirements_path = app_under_testing_path + "/spec/Requirements.md"
+pwd = pathlib.Path(__file__).parent
+app_under_testing_path = pwd / ".." / "postfinance" / "source"
+yaml_path = (
+    pathlib.Path(app_under_testing_path)
+    / "src"
+    / "main"
+    / "resources"
+    / "openapi"
+    / "openapi.yml"
+)
+requirements_path = pathlib.Path(app_under_testing_path) / "spec" / "Requirements.md"
 
 # What are the chances gpt will understand this?
 test_users = """\
@@ -254,7 +263,7 @@ def send_to_gpt(prompt: str, top_p: float = 0.5, temperature: float = 0.7, conte
 def get_test_ideas(story: str, j: int, persona: Persona):
     print("✨ Gathering ideas ✨")
 
-    @write_to_file(ideas_name(j, persona))
+    @write_to_file(ideas_name(j))
     def __inner_get_test_ideas(in_j: int):
         test_ideas = send_to_gpt(
             story,
@@ -282,7 +291,7 @@ def generate_test_from(
     def __inner_test_generation():
         res = send_to_gpt(
             test_idea + additional_prompt,
-            context=python_test_prompt(persona.prompt),
+            context=python_test_prompt(persona),
             top_p=0.2,
             temperature=0.2,
         )
@@ -302,8 +311,9 @@ def test_name(story_nr: int, test_nr: int):
     return f"test_story_{story_nr}_test_{test_nr}.py"
 
 
-def ideas_name(story_nr: int, persona: Persona):
-    return f"test_ideas_{story_nr}_{persona.identifier}.txt"
+def ideas_name(story_nr: int):
+    # TODO could add persona name, but then would alsov have to add to test_name to make sense
+    return f"test_ideas_{story_nr}.txt"
 
 
 def run_test(story_nr: int, test_nr: int):
@@ -342,7 +352,10 @@ def interactive():
     additional_prompt = ""
     story_nr = len(get_stories())
 
-    os.remove(ideas_name(story_nr))
+    try:
+        os.remove(ideas_name(story_nr))
+    except FileNotFoundError:
+        pass
     while True:
         try:
             os.remove(test_name(story_nr, 0))
@@ -361,6 +374,7 @@ def interactive():
             console = Console()
             gherkin = Markdown(story)
             idea_syn = Markdown(test_ideas[test_nr])
+            console.print(Markdown(f"# Story {story_nr}, Test {test_nr}"))
             console.print(Columns([Panel(gherkin), Panel(idea_syn), test_syntax]))
 
             choice = input(
@@ -368,11 +382,16 @@ def interactive():
             )
             if choice.lower() == "r":
                 os.remove(test_name(story_nr, test_nr))
-                additional_prompt = input("Additional prompt: ")
+                additional_prompt = input(
+                    "Additional prompt: "
+                )  # should also contain the previous output
+                if additional_prompt:
+                    additional_prompt = test + additional_prompt
                 continue
 
-        if choice.lower() == "a":
-            run_test(story_nr, test_nr)
+            if choice.lower() == "a":
+                print("Running Test")
+                run_test(story_nr, test_nr)
 
 
 def exhaustive():
@@ -416,6 +435,7 @@ def main():
     console = Console()
     gherkin = Markdown(stories[story_nr])
     idea_syn = Markdown(test_ideas[test_nr])
+    console.print(Markdown(f"# Story {story_nr}, Test {test_nr}"))
     console.print(Columns([Panel(gherkin), Panel(idea_syn), test_syntax]))
 
     run_test(story_nr, test_nr)
