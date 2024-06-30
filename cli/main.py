@@ -385,6 +385,7 @@ def interactive():
                 additional_prompt=additional_prompt,
             )
 
+            ## YES THIS IS FULL-BLOWN, 1:1 CODE DUPLICATION I AM SORRY
             test_syntax = Syntax(test, "python", theme="monokai", line_numbers=True)
             console = Console()
             gherkin = Markdown(story)
@@ -422,9 +423,9 @@ def interactive():
 def exhaustive():
     stories = ["\n".join(s) for s in get_stories()]
     for jj, story in enumerate(stories):
-        test_ideas = get_test_ideas(story, jj, Persona.cyber)
+        test_ideas = get_test_ideas(story, jj, CyberPersona)
         for ii, idea in enumerate(split_test_plan(test_ideas)):
-            generate_test_from(idea, jj, ii, Persona.cyber)
+            generate_test_from(idea, jj, ii, CyberPersona)
 
 
 def main():
