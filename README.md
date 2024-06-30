@@ -59,8 +59,8 @@ Furthermore at least one person in the team is now tempted to attempt TDD for th
 
 ### Team
 
-Laura Giulietti
-Martin Itten
-Pamela Pogliani
+Laura Giulietti, 
+Martin Itten, 
+Pamela Pogliani, 
 Roman Riesen
 
